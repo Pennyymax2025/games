@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kids Wordle</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f9ff; /* Light blue background */
+        }
+        .tile {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2.5rem; /* Large font for kids */
+            font-weight: bold;
+            border: 2px solid #cbd5e1; /* Light border */
+            border-radius: 8px; /* Rounded corners */
+            text-transform: uppercase;
+            transition: background-color 0.3s ease, border-color 0.3s ease, transform 0.1s ease;
+            user-select: none; /* Prevent text selection */
+            box-sizing: border-box; /* Include padding and border in element's total width and height */
+        }
+        .tile.correct {
+            background-color: #4ade80; /* Green */
+            border-color: #4ade80;
+            color: white;
+        }
+        .tile.present {
+            background-color: #fcd34d; /* Yellow */
+            border-color: #fcd34d;
+            color: white;
+        }
+        .tile.absent {
+            background-color: #94a3b8; /* Grey */
+            border-color: #94a3b8;
+            color: white;
+        }
+        .tile.filled {
+            border-color: #64748b; /* Darker border when filled */
+        }
+        .key {
+            /* Updated key colors for a more kid-friendly look */
+            @apply flex justify-center items-center font-bold rounded-md cursor-pointer select-none
+                   bg-purple-200 hover:bg-purple-300 active:bg-purple-400 text-purple-800
+                   transition-colors duration-100 ease-in-out;
+            /* Responsive adjustments for keys */
+            height: 48px; /* Reduced height for better fit on small screens */
+            min-width: 32px; /* Reduced min-width for better fit on small screens */
+            padding: 0 4px; /* Reduced padding */
+            font-size: 1.1rem; /* Adjusted font size */
+            flex-grow: 1; /* Allow keys to grow */
+            flex-shrink: 1; /* Allow keys to shrink */
+            box-sizing: border-box; /* Include padding and border in element's total width and height */
+        }
+        .key.correct {
+            background-color: #4ade80;
+            color: white;
+        }
+        .key.present {
+            background-color: #fcd34d;
+            color: white;
+        }
+        .key.absent {
+            background-color: #94a3b8;
+            color: white;
+        }
+        .key-wide {
+            flex-grow: 1.5;
+            min-width: 50px; /* Adjusted min-width for wide keys */
+        }
+        .grid-container {
+            display: grid;
+            grid-template-rows: repeat(6, 1fr);
+            gap: 8px;
+            max-width: 350px; /* Max width for grid */
+            width: 90%; /* Responsive width */
+            margin: 0 auto; /* Center the grid */
+            /* aspect-ratio set dynamically by JS */
+        }
+        .word-row {
+            display: grid;
+            /* grid-template-columns set dynamically by JS */
+            gap: 8px;
+            width: 100%;
+        }
+        .keyboard-row {
+            display: flex;
+            justify-content: center;
+            gap: 4px; /* Reduced gap between keys for better fit */
+            margin-bottom: 8px;
+            width: 100%;
+            max-width: 500px; /* Max width for keyboard */
+            padding: 0 4px; /* Added horizontal padding to the row itself */
+        }
+        .message-box {
+            background-color: #fef08a; /* Light yellow for messages */
+            color: #b45309; /* Darker yellow text */
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 80%;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        .message-box.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .main-button {
+            @apply px-8 py-4 rounded-full font-bold text-2xl transition-colors duration-200 ease-in-out;
+            @apply bg-blue-500 text-white hover:bg-blue-600 shadow-lg;
+        }
+        .level-button {
+            @apply px-6 py-3 rounded-full font-bold text-xl transition-colors duration-200 ease-in-out;
+            @apply bg-blue-400 text-white hover:bg-blue-500 shadow-md;
+        }
+        .level-button.active {
+            @apply bg-blue-700;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-between min-h-screen p-4 sm:p-6">
+    <h1 class="text-4xl sm:text-5xl font-bold text-blue-700 mb-6 mt-4">Kids Wordle!</h1>
+
+    <div id="welcome-screen" class="flex flex-col items-center justify-center flex-grow w-full max-w-md text-center">
+        <p class="text-3xl text-gray-700 mb-10">Welcome to Wordle Fun!</p>
+        <button id="start-game-btn" class="main-button">
+            Start Game!
+        </button>
+    </div>
+
+    <div id="level-selection-screen" class="flex flex-col items-center justify-center flex-grow w-full max-w-md hidden">
+        <p class="text-2xl text-gray-700 mb-8">Choose your word length:</p>
+        <div class="flex flex-col space-y-6 w-full">
+            <button id="level-4-btn" class="level-button" data-length="4">4 Letters</button>
+            <button id="level-5-btn" class="level-button" data-length="5">5 Letters</button>
+        </div>
+    </div>
+
+    <div id="game-screen" class="flex flex-col items-center w-full max-w-lg hidden">
+        <div id="message-box" class="message-box hidden"></div>
+
+        <div id="game-grid" class="grid-container mb-8">
+            </div>
+
+        <button id="hint-btn" class="px-6 py-2 bg-yellow-400 text-yellow-900 font-bold rounded-full shadow-md
+                                     hover:bg-yellow-500 transition-colors duration-200 ease-in-out mb-8">
+            Get a Hint! (1 Left)
+        </button>
+
+        <div id="keyboard" class="w-full flex flex-col items-center">
+            <div class="keyboard-row">
+                <button class="key" data-key="q">Q</button>
+                <button class="key" data-key="w">W</button>
+                <button class="key" data-key="e">E</button>
+                <button class="key" data-key="r">R</button>
+                <button class="key" data-key="t">T</button>
+                <button class="key" data-key="y">Y</button>
+                <button class="key" data-key="u">U</button>
+                <button class="key" data-key="i">I</button>
+                <button class="key" data-key="o">O</button>
+                <button class="key" data-key="p">P</button>
+            </div>
+            <div class="keyboard-row">
+                <button class="key" data-key="a">A</button>
+                <button class="key" data-key="s">S</button>
+                <button class="key" data-key="d">D</button>
+                <button class="key" data-key="f">F</button>
+                <button class="key" data-key="g">G</button>
+                <button class="key" data-key="h">H</button>
+                <button class="key" data-key="j">J</button>
+                <button class="key" data-key="k">K</button>
+                <button class="key" data-key="l">L</button>
+            </div>
+            <div class="keyboard-row">
+                <button class="key key-wide" data-key="backspace">Del</button>
+                <button class="key" data-key="z">Z</button>
+                <button class="key" data-key="x">X</button>
+                <button class="key" data-key="c">C</button>
+                <button class="key" data-key="v">V</button>
+                <button class="key" data-key="b">B</button>
+                <button class="key" data-key="n">N</button>
+                <button class="key" data-key="m">M</button>
+                <div class="key-wide" style="visibility: hidden;"></div>
+            </div>
+        </div>
+
+        <button id="play-again-btn" class="hidden mt-8 px-8 py-3 bg-green-500 text-white text-xl font-bold rounded-full shadow-lg
+                                            hover:bg-green-600 transition-colors duration-200 ease-in-out">
+            Play Again!
+        </button>
+    </div>
+
+    <script>
+        // Word lists for different lengths
+        const WORD_LISTS = {
+            4: [
+                "FISH", "BIRD", "BOOK", "PLAY", "JUMP", "BLUE", "RED", "TREE", "BALL", "CAR",
+                "HOME", "DOOR", "STAR", "MOON", "SUN", "RAIN", "CLOU", "FARM", "GARD", "READ",
+                "SING", "DUCK", "GOAT", "PIGS", "LION", "TENT", "SHIP", "BOAT", "ROAD", "TOWN",
+                "CITY", "PARK", "LAKE", "POND", "HILL", "SNOW", "COLD", "WARM", "HOT", "FIRE",
+                "WOOD", "ROCK", "SAND", "CLAY", "SOIL", "SEED", "GROW", "LEAF", "ROOT", "STEM",
+                "FLOR", "FRUT", "FOOD", "EAT", "DRNK", "SLEP", "WAKE", "BATH", "WASH", "COMB",
+                "BRSH", "SMIL", "LAUG", "CRY", "TALK", "WALK", "RUN", "SIT", "STAN", "OPEN",
+                "CLOS", "GIVE", "TAKE", "FIND", "LOSE", "HELP", "CALL", "HEAR", "SEE", "LOOK",
+                "FEEL", "THNK", "KNOW", "LEAR", "TEAC", "STUD", "WORK", "REST", "GAME", "FUN",
+                "LOVE", "KIND", "GOOD", "BAD", "NICE", "MEAN", "FAST", "SLOW", "QUIZ", "ZERO"
+            ],
+            5: [
+                "APPLE", "BAKER", "BEACH", "BEANS", "BEAST", "BIRDS", "BLACK", "BLANK", "BLOCK", "BLOOM",
+                "BOOKS", "BRAIN", "BREAD", "BRICK", "BRING", "BROWN", "BRUSH", "BUDDY", "BUNNY", "CANDY",
+                "CARDS", "CHAIR", "CHEER", "CHICK", "CHILD", "CHIPS", "CLEAN", "CLOUD", "CLOWN", "COAST",
+                "CRANE", "CRAZY", "CREAM", "CRICK", "CROWN", "CRUMB", "DANCE", "DREAM", "DRINK", "DUCKY",
+                "EARTH", "EIGHT", "ENJOY", "FAIRY", "FANCY", "FIGHT", "FLAME", "FLASK", "FLOOR", "FLOUR",
+                "FLUFF", "FRAME", "FRESH", "FRUIT", "FUNNY", "GIANT", "GLASS", "GLOWS", "GRAPE", "GRASS",
+                "GREEN", "HAPPY", "HEART", "HELLO", "HONEY", "HORSE", "HOUSE", "JUICE", "JUMPY", "KIDDY",
+                "KITTY", "KNIFE", "LEMON", "LIGHT", "LUCKY", "MAGIC", "MAPLE", "MELON", "MERRY", "MOUSE",
+                "MUSIC", "NIGHT", "NOISY", "OCEAN", "PAPER", "PEACH", "PEARL", "PLANT", "PUPPY", "QUEEN",
+                "RABIT", "READY", "RIVER", "ROBOT", "ROUND", "RULER", "SHINY", "SMILE", "SNAIL", "SOCKS",
+                "SPACE", "SPARK", "SPORT", "SQUID", "STARS", "STICK", "STONE", "STORY", "SUGAR", "SUNNY",
+                "SWEET", "TABLE", "TASTY", "TIGER", "TODAY", "TRAIN", "TREES", "TRICK", "TRUTH", "TULIP",
+                "UNCLE", "UNDER", "UNITY", "UPSET", "VALUE", "VAPOR", "VAULT", "VIDEO", "VILLA", "VINES",
+                "VIOLE", "VIRUS", "VISIT", "VITAL", "VIVID", "VOICE", "VOTER", "WAGON", "WATER", "WHALE",
+                "WHEEL", "WHITE", "WINDY", "WOMAN", "WORLD", "YACHT", "YIELD", "YOUNG", "YUMMY", "ZEBRA"
+            ]
+        };
+
+        const MAX_GUESSES = 6;
+        let WORD_LENGTH = 5; // Default word length, will be set by user choice
+        let secretWord = '';
+        let currentGuess = [];
+        let currentRow = 0;
+        let isGameOver = false;
+        let hintsRemaining = 1; // One hint per game
+
+        // Get references to all screen elements
+        const welcomeScreen = document.getElementById('welcome-screen');
+        const levelSelectionScreen = document.getElementById('level-selection-screen');
+        const gameScreen = document.getElementById('game-screen');
+
+        // Get references to game elements
+        const gameGrid = document.getElementById('game-grid');
+        const keyboard = document.getElementById('keyboard');
+        const messageBox = document.getElementById('message-box');
+        const playAgainBtn = document.getElementById('play-again-btn');
+        const hintBtn = document.getElementById('hint-btn');
+
+        // Get references to buttons
+        const startGameBtn = document.getElementById('start-game-btn');
+        const level4Btn = document.getElementById('level-4-btn');
+        const level5Btn = document.getElementById('level-5-btn');
+
+        // Function to show a specific screen and hide others
+        function showScreen(screenToShow) {
+            welcomeScreen.classList.add('hidden');
+            levelSelectionScreen.classList.add('hidden');
+            gameScreen.classList.add('hidden');
+
+            screenToShow.classList.remove('hidden');
+        }
+
+        // Function to initialize the game board and start a new game
+        function startGame() {
+            showScreen(gameScreen); // Show the game screen
+
+            // Select words based on current WORD_LENGTH
+            const wordsForLevel = WORD_LISTS[WORD_LENGTH];
+            secretWord = wordsForLevel[Math.floor(Math.random() * wordsForLevel.length)];
+            currentGuess = Array(WORD_LENGTH).fill(''); // Initialize with empty strings for all slots
+            currentRow = 0;
+            isGameOver = false;
+            hintsRemaining = 1; // Reset hints for new game
+
+            // Update UI elements
+            messageBox.classList.add('hidden');
+            messageBox.classList.remove('show');
+            playAgainBtn.classList.add('hidden');
+            hintBtn.classList.remove('hidden'); // Show hint button
+            hintBtn.textContent = `Get a Hint! (1 Left)`;
+            hintBtn.disabled = false; // Enable hint button
+
+            // Reset keyboard colors
+            document.querySelectorAll('.key').forEach(key => {
+                key.classList.remove('correct', 'present', 'absent');
+            });
+
+            // Clear previous grid and create new grid based on WORD_LENGTH
+            gameGrid.innerHTML = '';
+            gameGrid.style.aspectRatio = `${WORD_LENGTH} / 6`; // Adjust grid aspect ratio
+            for (let i = 0; i < MAX_GUESSES; i++) {
+                const row = document.createElement('div');
+                row.classList.add('word-row');
+                row.style.gridTemplateColumns = `repeat(${WORD_LENGTH}, 1fr)`; // Adjust columns
+                for (let j = 0; j < WORD_LENGTH; j++) {
+                    const tile = document.createElement('div');
+                    tile.classList.add('tile');
+                    tile.dataset.row = i;
+                    tile.dataset.col = j;
+                    row.appendChild(tile);
+                }
+                gameGrid.appendChild(row);
+            }
+        }
+
+        // Function to display messages to the user
+        function showMessage(message, duration = 2000) {
+            messageBox.textContent = message;
+            messageBox.classList.remove('hidden');
+            messageBox.classList.add('show');
+            setTimeout(() => {
+                messageBox.classList.remove('show');
+                // Hide after transition
+                setTimeout(() => messageBox.classList.add('hidden'), 300);
+            }, duration);
+        }
+
+        // Function to handle letter input
+        function handleKeyInput(key) {
+            if (isGameOver) return;
+
+            if (key === 'backspace' || key === 'del') {
+                // Find the last non-empty slot that is NOT a pre-filled correct letter
+                let lastEditableIndex = -1;
+                for (let i = WORD_LENGTH - 1; i >= 0; i--) {
+                    const tile = document.querySelector(`.tile[data-row="${currentRow}"][data-col="${i}"]`);
+                    // Check if the currentGuess slot has a letter AND it's not a pre-filled correct letter
+                    if (currentGuess[i] !== '' && !tile.classList.contains('correct')) {
+                        lastEditableIndex = i;
+                        break;
+                    }
+                }
+
+                if (lastEditableIndex !== -1) {
+                    currentGuess[lastEditableIndex] = ''; // Clear the letter
+                    updateGrid();
+                }
+            } else if (key.length === 1 && key.match(/[a-z]/i)) {
+                // Find the first empty slot to add the letter to
+                let firstEmptyIndex = -1;
+                for (let i = 0; i < WORD_LENGTH; i++) {
+                    const tile = document.querySelector(`.tile[data-row="${currentRow}"][data-col="${i}"]`);
+                    // Ensure it's empty in currentGuess AND it's not a pre-filled correct letter
+                    if (currentGuess[i] === '' && !tile.classList.contains('correct')) {
+                        firstEmptyIndex = i;
+                        break;
+                    }
+                }
+
+                if (firstEmptyIndex !== -1) {
+                    currentGuess[firstEmptyIndex] = key.toUpperCase();
+                    updateGrid();
+                    // Automatically check guess if all slots (including pre-filled) are now non-empty
+                    if (currentGuess.every(letter => letter !== '')) {
+                        checkGuess();
+                    }
+                }
+            }
+        }
+
+        // Function to update the visual grid with current guess
+        function updateGrid() {
+            const currentRowTiles = document.querySelectorAll(`.tile[data-row="${currentRow}"]`);
+            currentRowTiles.forEach((tile, index) => {
+                tile.textContent = currentGuess[index] || '';
+                if (currentGuess[index]) {
+                    tile.classList.add('filled');
+                } else {
+                    tile.classList.remove('filled');
+                }
+            });
+        }
+
+        // Function to check the submitted guess
+        function checkGuess() {
+            if (currentGuess.filter(letter => letter !== '').length !== WORD_LENGTH) {
+                showMessage('Not enough letters!');
+                return;
+            }
+
+            const guessWord = currentGuess.join('');
+
+            const secretWordLetters = secretWord.split('');
+            const guessWordLetters = guessWord.split('');
+            const currentRowTiles = document.querySelectorAll(`.tile[data-row="${currentRow}"]`);
+
+            let correctCount = 0;
+            let prefillNextRow = Array(WORD_LENGTH).fill(''); // Initialize for next row
+
+            // Create a temporary copy of secretWordLetters to track used letters for 'present' logic
+            const tempSecretWordLetters = [...secretWordLetters];
+
+            // First pass: Mark correct letters (green) and populate prefillNextRow
+            for (let i = 0; i < WORD_LENGTH; i++) {
+                const guessedLetter = guessWordLetters[i];
+                const tile = currentRowTiles[i];
+                const keyElement = document.querySelector(`.key[data-key="${guessedLetter.toLowerCase()}"]`);
+
+                if (tempSecretWordLetters[i] === guessedLetter) {
+                    tile.classList.add('correct');
+                    keyElement.classList.add('correct');
+                    correctCount++;
+                    prefillNextRow[i] = guessedLetter; // Store for next row
+                    tempSecretWordLetters[i] = '_'; // Mark as used in temp copy
+                }
+            }
+
+            // Second pass: Mark present letters (yellow) and absent letters (grey)
+            for (let i = 0; i < WORD_LENGTH; i++) {
+                const guessedLetter = guessWordLetters[i];
+                const tile = currentRowTiles[i];
+                const keyElement = document.querySelector(`.key[data-key="${guessedLetter.toLowerCase()}"]`);
+
+                if (tile.classList.contains('correct')) {
+                    continue; // Already handled as correct
+                }
+
+                const indexOfPresent = tempSecretWordLetters.indexOf(guessedLetter);
+                if (indexOfPresent !== -1) {
+                    tile.classList.add('present');
+                    if (!keyElement.classList.contains('correct')) { // Don't override green
+                        keyElement.classList.add('present');
+                    }
+                    tempSecretWordLetters[indexOfPresent] = '_'; // Mark as used in temp copy
+                } else {
+                    tile.classList.add('absent');
+                    if (!keyElement.classList.contains('correct') && !keyElement.classList.contains('present')) {
+                        keyElement.classList.add('absent');
+                    }
+                }
+            }
+
+            // Check for win/loss
+            if (correctCount === WORD_LENGTH) {
+                showMessage('You got it! Great job!', 3000);
+                isGameOver = true;
+                playAgainBtn.classList.remove('hidden');
+                hintBtn.classList.add('hidden'); // Hide hint button on win/loss
+            } else if (currentRow === MAX_GUESSES - 1) {
+                showMessage(`Game Over! The word was: ${secretWord}`, 5000);
+                isGameOver = true;
+                playAgainBtn.classList.remove('hidden');
+                hintBtn.classList.add('hidden'); // Hide hint button on win/loss
+            } else {
+                currentRow++;
+                currentGuess = [...prefillNextRow]; // Initialize next guess with pre-filled letters
+                updateGrid(); // Immediately show pre-filled letters for the new row
+            }
+        }
+
+        // Function to provide a hint
+        function useHint() {
+            if (isGameOver || hintsRemaining === 0) {
+                return;
+            }
+
+            // Find unguessed, non-correct letters to reveal
+            const availableHintIndices = [];
+            for (let i = 0; i < WORD_LENGTH; i++) {
+                // If the secret letter at this position is not yet correctly guessed in the current row
+                // (i.e., the tile is not green from a previous guess or not pre-filled by currentGuess)
+                const tile = document.querySelector(`.tile[data-row="${currentRow}"][data-col="${i}"]`);
+                if (secretWord[i] !== currentGuess[i] || !tile.classList.contains('correct')) {
+                    availableHintIndices.push(i);
+                }
+            }
+
+            if (availableHintIndices.length > 0) {
+                const randomIndex = availableHintIndices[Math.floor(Math.random() * availableHintIndices.length)];
+                currentGuess[randomIndex] = secretWord[randomIndex]; // Reveal the letter
+                updateGrid();
+                showMessage(`Hint: Letter '${secretWord[randomIndex]}' revealed!`, 2000);
+                hintsRemaining--;
+                hintBtn.textContent = `Get a Hint! (${hintsRemaining} Left)`;
+                if (hintsRemaining === 0) {
+                    hintBtn.disabled = true;
+                }
+                // If revealing the hint completes the word, check it
+                if (currentGuess.every(letter => letter !== '')) {
+                    checkGuess();
+                }
+            } else {
+                showMessage("No more letters to hint!", 2000);
+            }
+        }
+
+
+        // Event listener for virtual keyboard clicks
+        keyboard.addEventListener('click', (event) => {
+            if (event.target.classList.contains('key')) {
+                const key = event.target.dataset.key;
+                handleKeyInput(key);
+            }
+        });
+
+        // Event listener for physical keyboard input
+        document.addEventListener('keydown', (event) => {
+            const key = event.key.toLowerCase();
+            if (key === 'backspace') {
+                handleKeyInput('backspace');
+            } else if (key.length === 1 && key.match(/[a-z]/i)) {
+                handleKeyInput(key);
+            }
+        });
+
+        // Event listener for Play Again button (now goes back to welcome screen)
+        playAgainBtn.addEventListener('click', () => {
+            showScreen(welcomeScreen); // Go back to welcome screen
+            // Reset active class for level buttons for next selection
+            level4Btn.classList.remove('active');
+            level5Btn.classList.remove('active');
+        });
+
+        // Event listener for Hint button
+        hintBtn.addEventListener('click', useHint);
+
+        // Event listener for Start Game button
+        startGameBtn.addEventListener('click', () => {
+            showScreen(levelSelectionScreen); // Show level selection screen
+        });
+
+        // Event listeners for level selection buttons
+        level4Btn.addEventListener('click', () => {
+            WORD_LENGTH = 4;
+            level4Btn.classList.add('active'); // Add active class to selected button
+            level5Btn.classList.remove('active');
+            startGame(); // Start the game after level selection
+        });
+
+        level5Btn.addEventListener('click', () => {
+            WORD_LENGTH = 5;
+            level5Btn.classList.add('active'); // Add active class to selected button
+            level4Btn.classList.remove('active');
+            startGame(); // Start the game after level selection
+        });
+
+        // Initial state: Show welcome screen
+        window.onload = () => {
+            showScreen(welcomeScreen);
+        };
+    </script>
+</body>
+</html>
